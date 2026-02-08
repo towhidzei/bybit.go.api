@@ -126,7 +126,9 @@ func (b *WebSocket) Connect() (*WebSocket, error) {
 		wssUrl += "?max_alive_time=" + b.maxAliveTime
 	}
 	b.conn, _, err = websocket.DefaultDialer.Dial(wssUrl, nil)
-
+	if err != nil {
+		return nil, err
+	}
 	if b.requiresAuthentication() {
 		if err = b.sendAuth(); err != nil {
 			return nil, fmt.Errorf("Failed Connection:", fmt.Sprintf("%v", err))
