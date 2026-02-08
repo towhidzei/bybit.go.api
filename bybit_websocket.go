@@ -40,10 +40,12 @@ func (b *WebSocket) monitorConnection() {
 	for {
 		<-ticker.C
 		if !b.isConnected && b.ctx.Err() == nil { // Check if disconnected and context not done
-			fmt.Println("Attempting to reconnect...")
-			con := b.Connect() // Example, adjust parameters as needed
+			con, err := b.Connect() // Example, adjust parameters as needed
+			if err != nil {
+				fmt.Printf("unable to reconnect to socket")
+
+			}
 			if con == nil {
-				fmt.Println("Reconnection failed:")
 			} else {
 				b.isConnected = true
 				go b.handleIncomingMessages() // Restart message handling
@@ -117,7 +119,7 @@ func NewBybitPublicWebSocket(url string, handler MessageHandler) *WebSocket {
 	return c
 }
 
-func (b *WebSocket) Connect() *WebSocket {
+func (b *WebSocket) Connect() (*WebSocket, error) {
 	var err error
 	wssUrl := b.url
 	if b.maxAliveTime != "" {
@@ -127,8 +129,7 @@ func (b *WebSocket) Connect() *WebSocket {
 
 	if b.requiresAuthentication() {
 		if err = b.sendAuth(); err != nil {
-			fmt.Println("Failed Connection:", fmt.Sprintf("%v", err))
-			return nil
+			return nil, fmt.Errorf("Failed Connection:", fmt.Sprintf("%v", err))
 		}
 	}
 	b.isConnected = true
@@ -139,7 +140,7 @@ func (b *WebSocket) Connect() *WebSocket {
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 	go ping(b)
 
-	return b
+	return b, nil
 }
 
 func (b *WebSocket) SendSubscription(args []string) (*WebSocket, error) {
@@ -196,7 +197,6 @@ func (b *WebSocket) SendTradeRequest(tradeTruest map[string]interface{}) (*WebSo
 
 func ping(b *WebSocket) {
 	if b.pingInterval <= 0 {
-		fmt.Println("Ping interval is set to a non-positive value.")
 		return
 	}
 
@@ -220,7 +220,6 @@ func ping(b *WebSocket) {
 				fmt.Println("Failed to send ping:", err)
 				return
 			}
-			fmt.Println("Ping sent with UTC time:", currentTime)
 
 		case <-b.ctx.Done():
 			fmt.Println("Ping context closed, stopping ping.")
@@ -257,14 +256,12 @@ func (b *WebSocket) sendAuth() error {
 
 	// Convert to hexadecimal instead of base64
 	signature := hex.EncodeToString(h.Sum(nil))
-	fmt.Println("signature generated : " + signature)
 
 	authMessage := map[string]interface{}{
 		"req_id": uuid.New(),
 		"op":     "auth",
 		"args":   []interface{}{b.apiKey, expires, signature},
 	}
-	fmt.Println("auth args:", fmt.Sprintf("%v", authMessage["args"]))
 	return b.sendAsJson(authMessage)
 }
 
